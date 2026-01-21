@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HomeCast - Просмотр трансляций</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- QR код для подключения -->
+    <div id="qr-section" class="qr-section">
+        <div class="qr-content">
+            <h1>🎥 HomeCast</h1>
+            <p class="qr-description">Отсканируйте QR код в приложении</p>
+            <div class="qr-container">
+                <img id="qr-code" src="" alt="QR Code" />
+                <div class="qr-loading">Генерация QR кода...</div>
+            </div>
+            <div class="server-info">
+                <p><strong>IP:</strong> <span id="server-ip">-</span></p>
+                <p><strong>Порт:</strong> <span id="server-port">-</span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Просмотр стрима -->
+    <div id="viewer-section" class="viewer-section hidden">
+        <div class="video-container">
+            <video id="video-player" autoplay playsinline></video>
+            <canvas id="video-canvas"></canvas>
+            
+            <!-- Контролы при наведении -->
+            <div id="video-controls" class="video-controls">
+                <button id="fullscreen-btn" class="fullscreen-btn" title="Полный экран">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Статус подключения -->
+            <div id="connection-status" class="connection-status">
+                <span class="status-indicator"></span>
+                <span class="status-text">Ожидание подключения...</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="viewer.js"></script>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HomeCast Viewer</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>HomeCast</h1>
+      <p id="status" class="status">Ожидание подключения…</p>
+    </header>
+
+    <main>
+      <canvas id="screen" width="1280" height="720"></canvas>
+      <div id="placeholder" class="placeholder">
+        Подключитесь к стриму с устройства
+      </div>
+    </main>
+
+    <footer>
+      <span id="clients">Клиентов: 0</span>
+    </footer>
+  </div>
+
+  <script src="viewer.js"></script>
+</body>
+</html>
