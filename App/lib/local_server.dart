@@ -1,15 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 
 class LocalWebServer {
   LocalWebServer({this.port = 8080});
 
   final int port;
   HttpServer? _server;
+  Future<void>? _starting;
   final Set<WebSocket> _clients = {};
   final StreamController<int> _clientsCountController =
       StreamController<int>.broadcast();
@@ -42,9 +43,26 @@ class LocalWebServer {
 
   Future<void> start() async {
     if (_server != null) return;
+    if (_starting != null) {
+      await _starting;
+      return;
+    }
 
-    _server = await HttpServer.bind(InternetAddress.anyIPv4, port);
-    _server!.listen(_handleRequest, onError: (_) async => stop());
+    _starting = () async {
+      _server = await HttpServer.bind(
+        InternetAddress.anyIPv4,
+        port,
+        shared: true,
+      );
+      debugPrint('[HomeCast] LocalWebServer listening on 0.0.0.0:$port');
+      _server!.listen(_handleRequest, onError: (_) async => stop());
+    }();
+
+    try {
+      await _starting;
+    } finally {
+      _starting = null;
+    }
   }
 
   Future<void> stop() async {
@@ -58,12 +76,19 @@ class LocalWebServer {
     _server = null;
   }
 
-  Future<void> broadcastFrame(Uint8List bytes,
-      {String mimeType = 'image/jpeg'}) async {
+  Future<void> broadcastFrame(
+    Uint8List bytes, {
+    String mimeType = 'image/jpeg',
+    Map<String, dynamic>? meta,
+  }) async {
     if (_clients.isEmpty) return;
 
     final dataUrl = 'data:$mimeType;base64,${base64Encode(bytes)}';
-    final payload = jsonEncode({'type': 'frame', 'data': dataUrl});
+    final payload = jsonEncode({
+      'type': 'frame',
+      'data': dataUrl,
+      if (meta != null) 'meta': meta,
+    });
 
     for (final client in _clients.toList()) {
       if (client.readyState == WebSocket.open) {
@@ -73,8 +98,10 @@ class LocalWebServer {
   }
 
   void _handleRequest(HttpRequest request) async {
-    if (request.uri.path == '/ws' && WebSocketTransformer.isUpgradeRequest(request)) {
+    if (request.uri.path == '/ws' &&
+        WebSocketTransformer.isUpgradeRequest(request)) {
       final socket = await WebSocketTransformer.upgrade(request);
+      debugPrint('[HomeCast] WS connected from ${socket.hashCode}');
       _clients.add(socket);
       _clientsCountController.add(_clients.length);
 
@@ -86,11 +113,13 @@ class LocalWebServer {
         onDone: () {
           _clients.remove(socket);
           _clientsCountController.add(_clients.length);
+          debugPrint('[HomeCast] WS disconnected ${socket.hashCode}');
           _broadcastClientCount();
         },
         onError: (_) {
           _clients.remove(socket);
           _clientsCountController.add(_clients.length);
+          debugPrint('[HomeCast] WS error/disconnect ${socket.hashCode}');
           _broadcastClientCount();
         },
       );

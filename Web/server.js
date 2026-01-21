@@ -5,6 +5,8 @@ const cors = require('cors');
 const path = require('path');
 const QRCode = require('qrcode');
 const os = require('os');
+const fs = require('fs');
+const pathFs = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -20,26 +22,59 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.static('public'));
 
-// Получение локального IP
+// Получение локального IP (предпочитаем адреса, доступные телефону в LAN)
 function getLocalIP() {
   const interfaces = os.networkInterfaces();
+  const candidates = [];
+
   for (const name of Object.keys(interfaces)) {
     for (const iface of interfaces[name]) {
-      if (iface.family === 'IPv4' && !iface.internal) {
-        return iface.address;
-      }
+      if (iface.family !== 'IPv4' || iface.internal) continue;
+      const address = iface.address;
+      const lowerName = name.toLowerCase();
+
+      let score = 0;
+      if (address.startsWith('192.168.')) score += 30;
+      else if (address.startsWith('10.')) score += 20;
+      else if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(address)) score += 10;
+
+      if (lowerName.includes('wi-fi') || lowerName.includes('wifi')) score += 5;
+      if (lowerName.includes('wlan')) score += 5;
+      if (lowerName.includes('ethernet')) score += 3;
+
+      candidates.push({ address, score, name });
     }
   }
+
+  candidates.sort((a, b) => b.score - a.score);
+  if (candidates.length > 0) {
+    return candidates[0].address;
+  }
+
   return 'localhost';
+}
+
+function writeFlutterConfig(baseUrl) {
+  try {
+    const configPath = pathFs.resolve(__dirname, '..', 'App', 'assets', 'config.json');
+    const payload = JSON.stringify({ backendBaseUrl: baseUrl }, null, 2);
+    fs.writeFileSync(configPath, payload, 'utf8');
+    console.log('Flutter config updated:', configPath);
+  } catch (error) {
+    console.warn('Failed to write Flutter config:', error.message);
+  }
 }
 
 // Хранилище сессий: sessionId -> { viewerSocketId, localUrl }
 const sessions = new Map();
 
 function getBackendUrl(req) {
-  const host = req.get('host');
+  const override = process.env.BACKEND_URL;
+  if (override && override.trim().length > 0) return override.trim();
   const protocol = req.headers['x-forwarded-proto'] || req.protocol;
-  return `${protocol}://${host}`;
+  const port = process.env.PORT || 3000;
+  const ip = getLocalIP();
+  return `${protocol}://${ip}:${port}`;
 }
 
 function generateSessionId() {
@@ -52,6 +87,7 @@ app.get('/api/session', async (req, res) => {
     const sessionId = generateSessionId();
     const backendUrl = getBackendUrl(req);
     const url = `homecast://connect?session=${sessionId}&backend=${encodeURIComponent(backendUrl)}`;
+    console.log('[session] create', { sessionId, backendUrl });
 
     const qrCodeDataURL = await QRCode.toDataURL(url, {
       width: 300,
@@ -84,12 +120,14 @@ app.get('/api/session', async (req, res) => {
 // API для пары: мобильное приложение сообщает локальный URL
 app.post('/api/pair', (req, res) => {
   const { sessionId, localUrl } = req.body || {};
+  console.log('[pair] request', { sessionId, localUrl });
   if (!sessionId || !localUrl) {
     return res.status(400).json({ error: 'sessionId and localUrl required' });
   }
 
   const session = sessions.get(sessionId);
   if (!session) {
+    console.log('[pair] session not found', sessionId);
     return res.status(404).json({ error: 'session not found' });
   }
 
@@ -100,7 +138,22 @@ app.post('/api/pair', (req, res) => {
     io.to(session.viewerSocketId).emit('session-ready', { localUrl });
   }
 
+  console.log('[pair] ok', { sessionId, localUrl, viewerSocketId: session.viewerSocketId });
   return res.json({ ok: true });
+});
+
+// API для проверки статуса сессии
+app.get('/api/session/:sessionId', (req, res) => {
+  const sessionId = req.params.sessionId;
+  const session = sessions.get(sessionId);
+  if (!session) {
+    return res.status(404).json({ error: 'session not found' });
+  }
+
+  return res.json({
+    sessionId,
+    localUrl: session.localUrl || null,
+  });
 });
 
 // Храним активные стримы
@@ -115,6 +168,7 @@ io.on('connection', (socket) => {
     const session = sessions.get(sessionId) || { viewerSocketId: null, localUrl: null };
     session.viewerSocketId = socket.id;
     sessions.set(sessionId, session);
+    console.log('[watch-session]', { sessionId, viewerSocketId: socket.id, localUrl: session.localUrl });
     if (session.localUrl) {
       socket.emit('session-ready', { localUrl: session.localUrl });
     }
@@ -282,4 +336,7 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Сервер запущен на порту ${PORT}`);
   console.log(`Откройте http://localhost:${PORT} для просмотра`);
+  const ip = getLocalIP();
+  const baseUrl = process.env.BACKEND_URL || `http://${ip}:${PORT}`;
+  writeFlutterConfig(baseUrl);
 });

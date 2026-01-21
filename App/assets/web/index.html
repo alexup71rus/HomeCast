@@ -7,22 +7,21 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div class="container">
-    <header>
-      <h1>HomeCast</h1>
-      <p id="status" class="status">Ожидание подключения…</p>
-    </header>
+  <div id="viewer" class="viewer">
+    <canvas id="screen"></canvas>
 
-    <main>
-      <canvas id="screen" width="1280" height="720"></canvas>
-      <div id="placeholder" class="placeholder">
-        Подключитесь к стриму с устройства
-      </div>
-    </main>
+    <div id="controls" class="controls" aria-hidden="true">
+      <button id="fullscreen-btn" class="fullscreen-btn" aria-label="Полный экран">
+        <svg class="icon icon-enter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+        </svg>
+        <svg class="icon icon-exit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 3H5a2 2 0 0 0-2 2v4m12-6h4a2 2 0 0 1 2 2v4M9 21H5a2 2 0 0 1-2-2v-4m12 6h4a2 2 0 0 0 2-2v-4"/>
+        </svg>
+      </button>
+    </div>
 
-    <footer>
-      <span id="clients">Клиентов: 0</span>
-    </footer>
+    <div id="status-dot" class="status-dot" aria-hidden="true"></div>
   </div>
 
   <script src="viewer.js"></script>

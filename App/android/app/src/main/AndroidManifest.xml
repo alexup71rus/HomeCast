@@ -6,7 +6,8 @@
     <application
         android:label="homecast_app"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <service
             android:name=".ScreenCaptureService"
             android:exported="false"
