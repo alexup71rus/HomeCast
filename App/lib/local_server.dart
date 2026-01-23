@@ -83,13 +83,8 @@ class LocalWebServer {
   }) async {
     if (_clients.isEmpty) return;
 
-    // Protocol [1 byte Type] [Payload]
-    // Type 2: Video Frame
-    // BUT we also need meta info (rotation).
-    // Let's stick to JSON for meta + Binary for data? No, that's complex.
-    // Let's pack meta in header or just append.
-    // Simplest for now:
-    // [1 byte Type = 2] [4 bytes Meta Length] [JSON Meta] [JPEG Data]
+    // Protocol: [1 byte Type = 2] [4 bytes Meta Length] [JSON Meta] [JPEG Data]
+    // Type 2: Video Frame with Metadata
 
     final metaJson = jsonEncode(meta ?? {});
     final metaBytes = utf8.encode(metaJson);

@@ -8,6 +8,7 @@ import 'package:app_links/app_links.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import 'local_server.dart';
 import 'notification_service.dart';
@@ -344,6 +345,17 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
     }
   }
 
+  Future<void> _openRepo() async {
+    const repoUrl = 'https://github.com/alexup71rus/HomeCast';
+    final uri = Uri.parse(repoUrl);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Не удалось открыть GitHub')),
+      );
+    }
+  }
+
   Future<void> _initDeepLinks() async {
     try {
       final initial = await _appLinks.getInitialLink();
@@ -484,12 +496,8 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      // Use extendBodyBehindAppBar if we had an AppBar, but we have a custom header.
-      // To make status bar transparent work, we just need the top container to go up.
-      // We removed SafeArea from top.
       body: Column(
         children: [
-          // Status Header (Custom height handles status bar)
           _buildHeader(context),
 
           // Main Content
@@ -514,6 +522,8 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
 
                     // Settings Section
                     _buildSettingsCard(context),
+                    const SizedBox(height: 24),
+
                     const SizedBox(height: 80), // Space for bottom bar
                   ],
                 ),
@@ -594,6 +604,11 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
             ],
           ),
           const Spacer(),
+          IconButton(
+            icon: const FaIcon(FontAwesomeIcons.github, color: Colors.white),
+            onPressed: _openRepo,
+            tooltip: 'GitHub',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.white),
             onPressed: _busy ? null : _refreshConnection,

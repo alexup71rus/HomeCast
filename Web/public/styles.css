@@ -12,6 +12,35 @@ body {
     overflow: hidden;
 }
 
+.github-fab {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.35);
+    color: #fff;
+    text-decoration: none;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    transition: transform 0.2s ease, background 0.2s ease;
+    z-index: 10;
+}
+
+.github-fab:hover {
+    background: rgba(0, 0, 0, 0.5);
+    transform: translateY(-1px);
+}
+
+.github-fab svg {
+    width: 22px;
+    height: 22px;
+    fill: currentColor;
+}
+
 /* QR Section */
 .qr-section {
     display: flex;
@@ -89,6 +118,7 @@ body {
 .server-info span {
     font-weight: 700;
 }
+
 
 
 .status-indicator.error {
