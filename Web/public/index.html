@@ -4,14 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HomeCast - Просмотр трансляций</title>
+    <link rel="icon" type="image/png" href="favicon.png">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <!-- QR код для подключения -->
     <div id="qr-section" class="qr-section">
         <div class="qr-content">
-            <h1>🎥 HomeCast</h1>
-            <p class="qr-description">Отсканируйте QR код в приложении</p>
+            <div class="brand-container">
+                <img src="logo.png" alt="HomeCast Logo" class="app-logo">
+                <h1>HomeCast</h1>
+            </div>
             <div class="qr-container">
                 <img id="qr-code" src="" alt="QR Code" />
                 <div class="qr-loading">Генерация QR кода...</div>

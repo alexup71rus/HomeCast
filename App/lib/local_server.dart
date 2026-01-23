@@ -83,16 +83,61 @@ class LocalWebServer {
   }) async {
     if (_clients.isEmpty) return;
 
-    final dataUrl = 'data:$mimeType;base64,${base64Encode(bytes)}';
-    final payload = jsonEncode({
-      'type': 'frame',
-      'data': dataUrl,
-      if (meta != null) 'meta': meta,
-    });
+    // Protocol [1 byte Type] [Payload]
+    // Type 2: Video Frame
+    // BUT we also need meta info (rotation).
+    // Let's stick to JSON for meta + Binary for data? No, that's complex.
+    // Let's pack meta in header or just append.
+    // Simplest for now:
+    // [1 byte Type = 2] [4 bytes Meta Length] [JSON Meta] [JPEG Data]
+
+    final metaJson = jsonEncode(meta ?? {});
+    final metaBytes = utf8.encode(metaJson);
+    final metaLen = metaBytes.length;
+
+    final packet = Uint8List(1 + 4 + metaLen + bytes.length);
+    final view = ByteData.view(packet.buffer);
+
+    packet[0] = 0x02; // VIDEO TYPE
+    view.setUint32(1, metaLen, Endian.little);
+    packet.setRange(5, 5 + metaLen, metaBytes);
+    packet.setRange(5 + metaLen, packet.length, bytes);
 
     for (final client in _clients.toList()) {
       if (client.readyState == WebSocket.open) {
-        client.add(payload);
+        client.add(packet);
+      }
+    }
+  }
+
+  Future<void> broadcastAudio(Uint8List bytes) async {
+    if (_clients.isEmpty) return;
+
+    // Protocol [1 byte Type] [Payload]
+    // Type 1: Audio Chunk
+    final packet = Uint8List(1 + bytes.length);
+    packet[0] = 0x01; // AUDIO TYPE
+    packet.setRange(1, packet.length, bytes);
+
+    for (final client in _clients.toList()) {
+      if (client.readyState == WebSocket.open) {
+        client.add(packet);
+      }
+    }
+  }
+
+  Future<void> broadcastConfig(Map<String, dynamic> config) async {
+    if (_clients.isEmpty) return;
+
+    // Type 3: Config (JSON)
+    final jsonBytes = utf8.encode(jsonEncode(config));
+    final packet = Uint8List(1 + jsonBytes.length);
+    packet[0] = 0x03; // CONFIG TYPE
+    packet.setRange(1, packet.length, jsonBytes);
+
+    for (final client in _clients.toList()) {
+      if (client.readyState == WebSocket.open) {
+        client.add(packet);
       }
     }
   }

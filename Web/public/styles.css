@@ -36,12 +36,6 @@ body {
     text-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 
-.qr-description {
-    font-size: 1.3em;
-    opacity: 0.95;
-    margin-bottom: 40px;
-}
-
 .qr-container {
     position: relative;
     display: inline-block;
@@ -135,10 +129,6 @@ body {
         font-size: 2.5em;
     }
     
-    .qr-description {
-        font-size: 1.1em;
-    }
-    
     #qr-code {
         width: 250px;
         height: 250px;
@@ -159,3 +149,29 @@ body {
         height: 24px;
     }
 }
+
+
+/* Branding */
+.brand-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 30px;
+    gap: 20px;
+}
+
+.app-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+.brand-container h1 {
+    font-size: 3em;
+    margin: 0;
+    line-height: 1;
+    text-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    font-weight: 700;
+}
+

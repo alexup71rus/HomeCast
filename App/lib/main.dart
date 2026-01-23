@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:app_links/app_links.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -15,6 +16,13 @@ import 'screen_capture.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService.initialize();
+  // Set status bar to transparent to let app background shine through
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ),
+  );
   runApp(const HomeCastApp());
 }
 
@@ -23,11 +31,36 @@ class HomeCastApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Custom "Candy" color scheme based on Web styles
+    const primaryColor = Color(0xFF667EEA); // Periwinkle Blue
+    const secondaryColor = Color(0xFF764BA2); // Purple
+    const backgroundColor = Color(0xFF1A1A2E); // Dark Navy
+
     return MaterialApp(
       title: 'HomeCast',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: backgroundColor,
+        colorScheme: const ColorScheme.dark(
+          primary: primaryColor,
+          secondary: secondaryColor,
+          surface: Color(0xFF16213E),
+          surfaceContainer: Color(0xFF0F3460),
+          error: Color(0xFFE94560),
+        ),
         useMaterial3: true,
+        sliderTheme: SliderThemeData(
+          activeTrackColor: primaryColor,
+          inactiveTrackColor: primaryColor.withOpacity(0.3),
+          thumbColor: secondaryColor,
+          overlayColor: secondaryColor.withOpacity(0.2),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: primaryColor,
+            foregroundColor: Colors.white,
+          ),
+        ),
       ),
       home: const HomeCastHomePage(),
     );
@@ -49,6 +82,7 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
   StreamSubscription<String>? _notificationSub;
   StreamSubscription<Uri>? _linkSub;
   StreamSubscription<Uint8List>? _frameSub;
+  StreamSubscription<Uint8List>? _audioSub;
 
   bool _running = false;
   bool _busy = false;
@@ -64,6 +98,11 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
   DateTime? _lastUiUpdate;
   Orientation _deviceOrientation = Orientation.portrait;
 
+  // Settings
+  double _targetFps = 30;
+  double _quality = 60;
+  double _bufferMs = 150; // Reduced default latency
+
   @override
   void initState() {
     super.initState();
@@ -73,7 +112,11 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
     _clientSub = _server.clientCountStream.listen((count) {
       if (!mounted) return;
       setState(() => _clients = count);
+      // Send config to new clients
+      if (count > 0) _sendConfig();
     });
+
+    // ... rest of initState
 
     _notificationSub = NotificationService.actions.listen((action) {
       if (action == NotificationService.actionStop) {
@@ -89,10 +132,15 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
     Future.microtask(_startServerOnly);
   }
 
+  void _sendConfig() {
+    _server.broadcastConfig({'bufferMs': _bufferMs.toInt()});
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _frameSub?.cancel();
+    _audioSub?.cancel();
     _clientSub?.cancel();
     _notificationSub?.cancel();
     _linkSub?.cancel();
@@ -148,14 +196,34 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
     setState(() => _busy = true);
 
     await _ensureServerRunning();
+
+    final audioPermission = await Permission.microphone.request();
+    if (audioPermission != PermissionStatus.granted) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Для передачи звука нужно разрешение')),
+      );
+      setState(() => _busy = false);
+      return;
+    }
+
     await WakelockPlus.enable();
 
-    await ScreenCaptureService.start();
+    await ScreenCaptureService.start(
+      fps: _targetFps.toInt(),
+      quality: _quality.toInt(),
+    );
     await _frameSub?.cancel();
+    await _audioSub?.cancel();
     _framesReceived = 0;
     _fps = 0;
     _lastFpsTick = DateTime.now();
     _lastUiUpdate = DateTime.now();
+
+    _audioSub = ScreenCaptureService.audioFrames.listen((chunk) {
+      _server.broadcastAudio(chunk);
+    });
+
     _frameSub = ScreenCaptureService.frames.listen(
       (frame) {
         if (_framesReceived == 0) {
@@ -219,12 +287,16 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
   }
 
   Future<void> _stopSharing() async {
-    if (_busy)
-      return; // Allow force stop if not sharing check? removed !_sharing check for internal call validity
+    if (_busy) {
+      return;
+    }
     setState(() => _busy = true);
 
     await _frameSub?.cancel();
     _frameSub = null;
+    await _audioSub?.cancel();
+    _audioSub = null;
+
     await ScreenCaptureService.stop();
     await NotificationService.cancelRunning();
     await WakelockPlus.disable();
@@ -242,6 +314,9 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
 
     await _frameSub?.cancel();
     _frameSub = null;
+    await _audioSub?.cancel();
+    _audioSub = null;
+
     if (_sharing) {
       await ScreenCaptureService.stop();
     }
@@ -408,47 +483,430 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('HomeCast')),
-      body: RefreshIndicator(
-        onRefresh: _refreshConnection,
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: [
-            Text(
-              _running ? 'Сервер запущен' : 'Сервер остановлен',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            Text(_sharing ? 'Шаринг активен' : 'Шаринг остановлен'),
-            if (_sharing) ...[
-              const SizedBox(height: 4),
-              Text('FPS: ${_fps.toStringAsFixed(1)}'),
-            ],
-            const SizedBox(height: 12),
-            Text('URL: $_serverUrl'),
-            const SizedBox(height: 6),
-            Text('Подключений: $_clients'),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: _busy
-                        ? null
-                        : (_sharing ? _stopSharing : _startSharing),
-                    icon: Icon(_sharing ? Icons.stop : Icons.play_arrow),
-                    label: Text(_sharing ? 'Стоп шаринга' : 'Старт шаринга'),
-                  ),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      // Use extendBodyBehindAppBar if we had an AppBar, but we have a custom header.
+      // To make status bar transparent work, we just need the top container to go up.
+      // We removed SafeArea from top.
+      body: Column(
+        children: [
+          // Status Header (Custom height handles status bar)
+          _buildHeader(context),
+
+          // Main Content
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _refreshConnection,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Stats Cards
+                    if (_sharing) ...[
+                      _buildStatsRow(),
+                      const SizedBox(height: 24),
+                    ],
+
+                    // Connection Info
+                    _buildConnectionCard(context),
+                    const SizedBox(height: 24),
+
+                    // Settings Section
+                    _buildSettingsCard(context),
+                    const SizedBox(height: 80), // Space for bottom bar
+                  ],
                 ),
-              ],
+              ),
             ),
+          ),
+
+          // Bottom Action Bar
+          _buildBottomBar(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    final statusColor = _sharing
+        ? Theme.of(context).colorScheme.error
+        : (_running ? Colors.greenAccent : Colors.grey);
+    // Gradient header to match web style
+    return Container(
+      padding: const EdgeInsets.only(
+        left: 24,
+        right: 24,
+        bottom: 24,
+        top: 60,
+      ), // Top padding for status bar
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black45,
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Image.asset('assets/logo.png', width: 48, height: 48),
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'HomeCast',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: statusColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _sharing
+                        ? 'Эфир идет'
+                        : (_running ? 'Готов к работе' : 'Остановлен'),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withOpacity(0.9),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _busy ? null : _refreshConnection,
+            tooltip: 'Перезагрузить сервер',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatsRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: _buildStatCard(
+            'FPS',
+            _fps.toStringAsFixed(1),
+            Icons.speed,
+            Colors.blueAccent,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _buildStatCard(
+            'Клиенты',
+            '$_clients',
+            Icons.people_outline,
+            Colors.orangeAccent,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(
+    String label,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          Text(label, style: const TextStyle(color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildConnectionCard(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.link, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Локальный адрес',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: _openUrl,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _serverUrl,
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                  const Icon(Icons.open_in_new, size: 16),
+                ],
+              ),
+            ),
+          ),
+          if (_lastBackendUri != null) ...[
             const SizedBox(height: 12),
             Text(
-              'Потяните вниз, чтобы перезапустить сервер и переподключиться к облаку.',
-              style: Theme.of(context).textTheme.bodySmall,
+              'Подключено к облаку: ${_lastBackendUri?.host}',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.greenAccent),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettingsCard(BuildContext context) {
+    return Card(
+      elevation: 4,
+      color: Theme.of(context).colorScheme.surfaceContainer,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.settings, size: 20, color: Colors.white70),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Настройки трансляции',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: _sharing
+                        ? null
+                        : () {
+                            setState(() {
+                              _targetFps = 30;
+                              _quality = 60;
+                              _bufferMs = 150;
+                            });
+                            _sendConfig();
+                          },
+                    child: Text(
+                      'Сброс',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.secondary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildSlider(
+              'Скорость (FPS)',
+              '${_targetFps.toInt()}',
+              _targetFps,
+              10,
+              60,
+              5,
+              (v) => _sharing ? null : setState(() => _targetFps = v),
+            ),
+            const Divider(
+              height: 1,
+              indent: 16,
+              endIndent: 16,
+              color: Colors.white10,
+            ),
+            _buildSlider(
+              'Качество (JPEG)',
+              '${_quality.toInt()}%',
+              _quality,
+              10,
+              100,
+              9,
+              (v) => _sharing ? null : setState(() => _quality = v),
+            ),
+            const Divider(
+              height: 1,
+              indent: 16,
+              endIndent: 16,
+              color: Colors.white10,
+            ),
+            _buildSlider(
+              'Буфер (Latency)',
+              '${_bufferMs.toInt()} ms',
+              _bufferMs,
+              0,
+              500,
+              10,
+              (v) {
+                setState(() => _bufferMs = v);
+                _sendConfig();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSlider(
+    String title,
+    String valueLabel,
+    double value,
+    double min,
+    double max,
+    int divisions,
+    Function(double)? onChanged,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white70,
+                ),
+              ),
+              Text(
+                valueLabel,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+              ),
+            ],
+          ),
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 6,
+              activeTrackColor: Theme.of(context).colorScheme.secondary,
+              inactiveTrackColor: Colors.white12,
+              thumbColor: Colors.white,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 20),
+            ),
+            child: Slider(
+              value: value,
+              min: min,
+              max: max,
+              divisions: divisions,
+              label: valueLabel,
+              onChanged: onChanged,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomBar(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      // No decoration or background
+      width: double.infinity,
+      child: FilledButton.icon(
+        onPressed: _busy ? null : (_sharing ? _stopSharing : _startSharing),
+        style: FilledButton.styleFrom(
+          backgroundColor: _sharing
+              ? Theme.of(context).colorScheme.error
+              : Theme.of(context).colorScheme.primary,
+          foregroundColor: Colors.white, // FORCE WHITE TEXT
+          // Added large horizontal padding
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 32),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          elevation: 8,
+          shadowColor:
+              (_sharing
+                      ? Theme.of(context).colorScheme.error
+                      : Theme.of(context).colorScheme.primary)
+                  .withOpacity(0.5),
+        ),
+        icon: _busy
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : Icon(_sharing ? Icons.stop_circle_outlined : Icons.sensors),
+        label: Text(
+          _busy
+              ? 'Загрузка...'
+              : (_sharing ? 'ОСТАНОВИТЬ ТРАНСЛЯЦИЮ' : 'НАЧАТЬ ТРАНСЛЯЦИЮ'),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
       ),
     );

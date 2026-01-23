@@ -21,10 +21,16 @@ class ScreenCaptureService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = buildNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            var types = ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+            if (Build.VERSION.SDK_INT >= 30) { // Android 11+ for microphone type constant availability? 
+                 // Actually types are bitmask.
+                 // ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE is added in API 30.
+                 types = types or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            }
             startForeground(
                 NOTIFICATION_ID,
                 notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                types
             )
         } else {
             startForeground(NOTIFICATION_ID, notification)

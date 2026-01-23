@@ -38,6 +38,7 @@ dependencies:
   url_launcher: ^6.3.0
   app_links: ^6.0.0
   wakelock_plus: ^1.4.0
+  permission_handler: ^12.0.1
 
 dev_dependencies:
   flutter_test:
@@ -67,6 +68,7 @@ flutter:
     - assets/web/viewer.js
     - assets/web/styles.css
     - assets/config.json
+    - assets/logo.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
