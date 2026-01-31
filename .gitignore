@@ -5,3 +5,5 @@ gen_icons.ps1
 *.keystore
 *.pem
 pepk_out.zip
+pepk.jar
+App/android/key.properties

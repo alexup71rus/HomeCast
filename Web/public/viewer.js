@@ -1,5 +1,3 @@
-const socket = io();
-
 const qrSection = document.getElementById('qr-section');
 const viewerSection = document.getElementById('viewer-section');
 const statusText = document.querySelector('.status-text');
@@ -8,12 +6,12 @@ const statusIndicator = document.querySelector('.status-indicator');
 let currentSessionId = null;
 let redirectDone = false;
 let pollTimer = null;
+let sse = null;
 
 init();
 
 function init() {
     loadQRCode();
-    setupSocketListeners();
 }
 
 async function loadQRCode() {
@@ -26,9 +24,8 @@ async function loadQRCode() {
         qrImage.classList.add('loaded');
 
         currentSessionId = data.sessionId;
-        socket.emit('watch-session', { sessionId: data.sessionId });
         updateStatus('connecting', 'Ожидание подключения устройства...');
-        startPolling();
+        startSse();
     } catch (error) {
         console.error('Ошибка загрузки QR кода:', error);
         document.querySelector('.qr-loading').textContent = 'Ошибка загрузки QR кода';
@@ -36,16 +33,26 @@ async function loadQRCode() {
     }
 }
 
-function setupSocketListeners() {
-    socket.on('session-ready', (data) => {
-        if (data && data.localUrl) {
-            redirectToLocal(data.localUrl);
+function startSse() {
+    if (!currentSessionId || sse) return;
+    sse = new EventSource(`/api/session/${currentSessionId}/stream`);
+    sse.addEventListener('ready', (event) => {
+        try {
+            const data = JSON.parse(event.data);
+            if (data && data.localUrl) {
+                redirectToLocal(data.localUrl);
+            }
+        } catch (_) {
+            // ignore
         }
     });
-
-    socket.on('connect_error', () => {
-        updateStatus('error', 'Ошибка соединения с сервером');
-    });
+    sse.onerror = () => {
+        if (sse) {
+            sse.close();
+            sse = null;
+        }
+        startPolling();
+    };
 }
 
 function startPolling() {
@@ -70,6 +77,14 @@ function redirectToLocal(localUrl) {
     redirectDone = true;
     updateStatus('connected', 'Перенаправление...');
     console.log('Redirect to local url:', localUrl);
+    if (sse) {
+        sse.close();
+        sse = null;
+    }
+    if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+    }
     window.location.assign(localUrl);
 }
 

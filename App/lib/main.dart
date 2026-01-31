@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:app_links/app_links.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -134,8 +135,10 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
     });
 
     NotificationService.requestPermission();
-    _loadBackendConfig();
-    _initDeepLinks();
+    if (!kReleaseMode) {
+      _loadBackendConfig();
+      _initDeepLinks();
+    }
     Future.microtask(_startServerOnly);
   }
 
@@ -373,6 +376,7 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
   }
 
   Future<void> _handleLink(Uri? uri) async {
+    if (kReleaseMode) return;
     if (uri == null || uri.scheme != 'homecast') return;
     final sessionId = uri.queryParameters['session'];
     final backendRaw = uri.queryParameters['backend'];
@@ -425,6 +429,8 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
 
     await _startServerOnly();
 
+    if (kReleaseMode) return;
+
     if (_lastSessionId == null) return;
     final backendUrl = _lastBackendUri ?? _backendOverride;
     if (backendUrl == null) {
@@ -443,6 +449,7 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
   }
 
   Future<void> _loadBackendConfig() async {
+    if (kReleaseMode) return;
     try {
       final data = await rootBundle.loadString('assets/config.json');
       final json = jsonDecode(data) as Map<String, dynamic>;
