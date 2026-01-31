@@ -93,7 +93,7 @@ app.get('/api/session', async (req, res) => {
       width: 300,
       margin: 2,
       color: {
-        dark: '#667eea',
+        dark: '#CF956B',
         light: '#ffffff'
       }
     });

@@ -1,1 +1,7 @@
 gen_icons.ps1
+
+# Sensitive keys/certs
+*.jks
+*.keystore
+*.pem
+pepk_out.zip

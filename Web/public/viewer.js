@@ -25,9 +25,6 @@ async function loadQRCode() {
         qrImage.src = data.qrCode;
         qrImage.classList.add('loaded');
 
-        document.getElementById('server-ip').textContent = data.serverInfo.ip;
-        document.getElementById('server-port').textContent = data.serverInfo.port;
-
         currentSessionId = data.sessionId;
         socket.emit('watch-session', { sessionId: data.sessionId });
         updateStatus('connecting', 'Ожидание подключения устройства...');

@@ -68,6 +68,7 @@ flutter:
     - assets/web/index.html
     - assets/web/viewer.js
     - assets/web/styles.css
+    - assets/web/favicon.ico
     - assets/config.json
     - assets/logo.png
 

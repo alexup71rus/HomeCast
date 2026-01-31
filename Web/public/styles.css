@@ -47,7 +47,7 @@ body {
     align-items: center;
     justify-content: center;
     min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #CF956B 0%, #B77850 100%);
 }
 
 .qr-section.hidden {
@@ -62,7 +62,6 @@ body {
 .qr-content h1 {
     font-size: 3.5em;
     margin-bottom: 20px;
-    text-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 
 .qr-container {
@@ -87,7 +86,7 @@ body {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    color: #667eea;
+    color: #CF956B;
     font-size: 1.2em;
     font-weight: 600;
 }
@@ -95,31 +94,6 @@ body {
 #qr-code.loaded + .qr-loading {
     display: none;
 }
-
-.server-info {
-    display: flex;
-    gap: 30px;
-    justify-content: center;
-    padding: 20px;
-    background: rgba(255,255,255,0.15);
-    border-radius: 15px;
-    backdrop-filter: blur(10px);
-}
-
-.server-info p {
-    font-size: 1.1em;
-    margin: 0;
-}
-
-.server-info strong {
-    opacity: 0.9;
-}
-
-.server-info span {
-    font-weight: 700;
-}
-
-
 
 .status-indicator.error {
     background: #f44336;
@@ -194,14 +168,15 @@ body {
     width: 64px;
     height: 64px;
     border-radius: 50%;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 
 .brand-container h1 {
-    font-size: 3em;
+    /* font-size: 3em;
     margin: 0;
     line-height: 1;
-    text-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    font-weight: 700;
+    font-weight: 700; */
+    display: none;
+    font-size: 0;
+    opacity: 0;
 }
 

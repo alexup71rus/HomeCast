@@ -33,20 +33,26 @@ class HomeCastApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Custom "Candy" color scheme based on Web styles
-    const primaryColor = Color(0xFF667EEA); // Periwinkle Blue
-    const secondaryColor = Color(0xFF764BA2); // Purple
+    const primaryColor = Color(0xFFCF956B); // Sandstone
+    const secondaryColor = Color(0xFFB77850); // Toasted
     const backgroundColor = Color(0xFF1A1A2E); // Dark Navy
+    const surfaceColor = Color(0xFF0F1F2A);
+    const surfaceAltColor = Color(0xFF122636);
 
     return MaterialApp(
       title: 'HomeCast',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: backgroundColor,
         colorScheme: const ColorScheme.dark(
           primary: primaryColor,
           secondary: secondaryColor,
-          surface: Color(0xFF16213E),
-          surfaceContainer: Color(0xFF0F3460),
+          surface: surfaceColor,
+          surfaceContainer: surfaceAltColor,
+          surfaceContainerHigh: Color(0xFF162A3A),
+          surfaceContainerLow: Color(0xFF0C1720),
+          outlineVariant: Color(0xFF28404F),
           error: Color(0xFFE94560),
         ),
         useMaterial3: true,
@@ -552,7 +558,7 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
       ), // Top padding for status bar
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+          colors: [Color(0xFFCF956B), Color(0xFFB77850)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -567,7 +573,14 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
       ),
       child: Row(
         children: [
-          Image.asset('assets/logo.png', width: 48, height: 48),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: 54,
+              height: 54,
+              child: Image.asset('assets/logo.png', fit: BoxFit.cover),
+            ),
+          ),
           const SizedBox(width: 16),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -654,6 +667,16 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.4),
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33000000),
+            blurRadius: 10,
+            offset: Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -679,6 +702,13 @@ class _HomeCastHomePageState extends State<HomeCastHomePage>
         border: Border.all(
           color: Theme.of(context).colorScheme.outlineVariant.withOpacity(0.5),
         ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x26000000),
+            blurRadius: 12,
+            offset: Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
